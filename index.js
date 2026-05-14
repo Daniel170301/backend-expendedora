@@ -21,16 +21,20 @@ client.on('connect', () => {
 // --- 2. EL WEBHOOK ---
 app.post('/api/pago-recibido', (req, res) => {
     
-    // Como usamos bodyParser.text, req.body ahora es directamente el texto de MacroDroid
     const textoNotificacion = req.body || "";
     console.log(`📩 Notificación entrante:\n${textoNotificacion}`);
 
-    // Buscamos dinámicamente "S/ " seguido del número (Ej: "S/ 2.50")
-    const extraccion = textoNotificacion.match(/S\/\s*(\d+\.\d{2})/);
+    // NUEVO FILTRO MÁS FLEXIBLE: Busca "S/ " seguido de números con o sin decimales
+    const extraccion = textoNotificacion.match(/S\/\s*(\d+(?:\.\d+)?)/);
 
     if (extraccion) {
-        const montoPagado = extraccion[1]; 
-        console.log(`💰 ¡Monto detectado automáticamente!: S/ ${montoPagado}`);
+        // Extraemos el número crudo (ej: "2.5")
+        const numeroCrudo = parseFloat(extraccion[1]);
+        
+        // MAGIA: Lo forzamos a tener siempre exactamente 2 decimales (ej: "2.50")
+        const montoPagado = numeroCrudo.toFixed(2); 
+
+        console.log(`💰 ¡Monto detectado y normalizado!: S/ ${montoPagado}`);
         
         const orden = `PAGO:${montoPagado}`;
         client.publish(topicMaquina, orden);
@@ -38,11 +42,10 @@ app.post('/api/pago-recibido', (req, res) => {
         
         res.status(200).send('Monto procesado correctamente');
     } else {
-        console.log('❌ Error: No se encontró un formato de dinero válido (S/ X.XX).');
+        console.log('❌ Error: No se encontró un formato de dinero válido.');
         res.status(400).send('No se detectó el precio');
     }
 });
-
 // --- 3. ENCENDEMOS EL SERVIDOR ---
 const PUERTO = process.env.PORT || 3000;
 app.listen(PUERTO, () => {
